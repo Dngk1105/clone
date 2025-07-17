@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import PoseDetection from "client/src/components/camera/PoseDetection.tsx"; // chỉnh lại path nếu khác
+import PoseDetection from "@/components/camera/PoseDetection.tsx"; // chỉnh lại path nếu khác
 
 export default function PosePage() {
   const videoRef = useRef<HTMLVideoElement>(null);
