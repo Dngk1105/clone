@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import * as poseDetection from "@tensorflow-models/pose-detection";
+import "@tensorflow/tfjs-backend-webgl";
 
 interface PoseDetectionProps {
   videoRef: React.RefObject<HTMLVideoElement>;
@@ -13,11 +15,10 @@ export default function PoseDetection({
   canvasRef,
   isActive,
   onPostureUpdate,
-  onRepCount
+  onRepCount,
 }: PoseDetectionProps) {
   const animationRef = useRef<number>();
   const [repCount, setRepCount] = useState(0);
-  const [lastPostureCheck, setLastPostureCheck] = useState(0);
 
   useEffect(() => {
     if (!isActive) {
@@ -27,125 +28,98 @@ export default function PoseDetection({
       return;
     }
 
-    // TODO: Replace with actual MediaPipe implementation
-    // This is a simulation of pose detection functionality
-    const detectPose = () => {
-      if (!videoRef.current || !canvasRef.current) return;
+    let detector: poseDetection.PoseDetector | null = null;
+    let rafId: number;
 
-      const canvas = canvasRef.current;
-      const video = videoRef.current;
-      const ctx = canvas.getContext('2d');
-      
-      if (!ctx) return;
-
-      // Set canvas size to match video
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-
-      // Clear canvas
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      // Simulate pose detection with random values that change over time
-      const now = Date.now();
-      if (now - lastPostureCheck > 1000) { // Update every second
-        // Simulate varying posture scores
-        const baseScore = 75 + Math.sin(now / 5000) * 15; // Oscillates between 60-90
-        const randomVariation = (Math.random() - 0.5) * 10;
-        const postureScore = Math.max(0, Math.min(100, Math.round(baseScore + randomVariation)));
-        
-        onPostureUpdate(postureScore);
-        
-        // Simulate rep counting (increment every 3-5 seconds during exercise)
-        if (Math.random() < 0.3) { // 30% chance each second to count a rep
-          const newRepCount = repCount + 1;
-          setRepCount(newRepCount);
-          onRepCount(newRepCount);
-        }
-        
-        setLastPostureCheck(now);
-      }
-
-      // Draw simulated pose landmarks
-      drawSimulatedPose(ctx, canvas.width, canvas.height, now);
-
-      // Continue animation loop
-      animationRef.current = requestAnimationFrame(detectPose);
+    const loadDetector = async () => {
+      await poseDetection
+        .createDetector(poseDetection.SupportedModels.MoveNet, {
+          modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING,
+        })
+        .then((d) => {
+          detector = d;
+          startDetection();
+        });
     };
 
-    detectPose();
+    const startDetection = async () => {
+      const detect = async () => {
+        if (!videoRef.current || !canvasRef.current || !detector) return;
+
+        const video = videoRef.current;
+        const canvas = canvasRef.current;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        const poses = await detector.estimatePoses(video);
+        if (poses && poses.length > 0) {
+          drawPose(ctx, poses[0]);
+
+          // Cập nhật posture giả định (chấm điểm tạm thời)
+          onPostureUpdate(100);
+
+          // Đếm rep ngẫu nhiên (bạn có thể thay bằng logic thực tế)
+          if (Math.random() < 0.02) {
+            const newCount = repCount + 1;
+            setRepCount(newCount);
+            onRepCount(newCount);
+          }
+        }
+
+        rafId = requestAnimationFrame(detect);
+      };
+
+      detect();
+    };
+
+    loadDetector();
 
     return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
+      if (rafId) cancelAnimationFrame(rafId);
+      if (detector?.dispose) detector.dispose();
     };
-  }, [isActive, videoRef, canvasRef, onPostureUpdate, onRepCount, repCount, lastPostureCheck]);
+  }, [isActive, repCount, onPostureUpdate, onRepCount, videoRef, canvasRef]);
 
-  const drawSimulatedPose = (ctx: CanvasRenderingContext2D, width: number, height: number, timestamp: number) => {
-    // Simulate drawing pose landmarks
-    const centerX = width / 2;
-    const centerY = height / 2;
-    
-    // Create animated pose points that move slightly
-    const time = timestamp / 1000;
-    const points = [
-      // Head
-      { x: centerX + Math.sin(time) * 5, y: centerY - 100, label: 'head' },
-      // Shoulders
-      { x: centerX - 80 + Math.cos(time) * 3, y: centerY - 50, label: 'left_shoulder' },
-      { x: centerX + 80 - Math.cos(time) * 3, y: centerY - 50, label: 'right_shoulder' },
-      // Elbows
-      { x: centerX - 100 + Math.sin(time * 1.2) * 5, y: centerY, label: 'left_elbow' },
-      { x: centerX + 100 - Math.sin(time * 1.2) * 5, y: centerY, label: 'right_elbow' },
-      // Wrists
-      { x: centerX - 120 + Math.cos(time * 1.5) * 8, y: centerY + 50, label: 'left_wrist' },
-      { x: centerX + 120 - Math.cos(time * 1.5) * 8, y: centerY + 50, label: 'right_wrist' },
-      // Hip
-      { x: centerX, y: centerY + 80, label: 'hip' },
-      // Knees
-      { x: centerX - 40 + Math.sin(time * 0.8) * 3, y: centerY + 150, label: 'left_knee' },
-      { x: centerX + 40 - Math.sin(time * 0.8) * 3, y: centerY + 150, label: 'right_knee' },
-    ];
-
-    // Draw pose connections
-    ctx.strokeStyle = 'rgba(216, 136, 163, 0.8)'; // mom-pink color
+  const drawPose = (ctx: CanvasRenderingContext2D, pose: poseDetection.Pose) => {
+    const keypoints = pose.keypoints;
+    ctx.strokeStyle = "rgba(0,255,0,0.6)";
+    ctx.fillStyle = "rgba(255,0,0,0.8)";
     ctx.lineWidth = 2;
-    
-    const connections = [
-      [0, 1], [0, 2], // head to shoulders
-      [1, 3], [2, 4], // shoulders to elbows
-      [3, 5], [4, 6], // elbows to wrists
-      [1, 7], [2, 7], // shoulders to hip
-      [7, 8], [7, 9], // hip to knees
-    ];
 
-    connections.forEach(([start, end]) => {
-      ctx.beginPath();
-      ctx.moveTo(points[start].x, points[start].y);
-      ctx.lineTo(points[end].x, points[end].y);
-      ctx.stroke();
+    // Vẽ khung xương giữa các cặp điểm
+    const adjacentPairs = poseDetection.util.getAdjacentPairs(poseDetection.SupportedModels.MoveNet);
+    adjacentPairs.forEach(([i, j]) => {
+      const kp1 = keypoints[i];
+      const kp2 = keypoints[j];
+      if (kp1.score > 0.4 && kp2.score > 0.4) {
+        ctx.beginPath();
+        ctx.moveTo(kp1.x, kp1.y);
+        ctx.lineTo(kp2.x, kp2.y);
+        ctx.stroke();
+      }
     });
 
-    // Draw pose landmarks
-    points.forEach((point, index) => {
-      ctx.beginPath();
-      ctx.arc(point.x, point.y, 6, 0, 2 * Math.PI);
-      ctx.fillStyle = 'rgba(216, 136, 163, 0.9)'; // mom-pink color
-      ctx.fill();
-      ctx.strokeStyle = 'white';
-      ctx.lineWidth = 2;
-      ctx.stroke();
+    // Vẽ các điểm khớp (keypoints)
+    keypoints.forEach((kp) => {
+      if (kp.score > 0.4) {
+        ctx.beginPath();
+        ctx.arc(kp.x, kp.y, 5, 0, 2 * Math.PI);
+        ctx.fill();
+      }
     });
 
-    // Draw feedback text
-    ctx.font = '16px Inter, sans-serif';
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-    ctx.fillText('Pose tracking active', 20, 30);
-    
+    // Hiển thị số rep hiện tại
+    ctx.font = "16px Inter, sans-serif";
+    ctx.fillStyle = "white";
+    ctx.fillText("Pose tracking active", 20, 30);
     if (repCount > 0) {
       ctx.fillText(`Reps: ${repCount}`, 20, 55);
     }
   };
 
-  return null; // This component only handles the pose detection logic
+  return null; // component này chỉ xử lý logic
 }
