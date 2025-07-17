@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/useAuth";
+
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/landing";
 import Home from "@/pages/home";
@@ -11,6 +12,7 @@ import Exercises from "@/pages/exercises";
 import Wellness from "@/pages/wellness";
 import Progress from "@/pages/progress";
 import Chat from "@/pages/chat";
+import PosePage from "@/pages/PosePage"; // ✅ thêm route mới
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -26,6 +28,7 @@ function Router() {
           <Route path="/wellness" component={Wellness} />
           <Route path="/progress" component={Progress} />
           <Route path="/chat" component={Chat} />
+          <Route path="/pose" component={PosePage} /> {/* ✅ route mới */}
         </>
       )}
       <Route component={NotFound} />
