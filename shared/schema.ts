@@ -72,7 +72,7 @@ export const chatConversations = pgTable("chat_conversations", {
 // User progress tracking
 export const userProgress = pgTable("user_progress", {
   id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull().references(() => users.id),
+  userId: integer("user_id").notNull().references(() => users.id).unique(),
   weeklyExerciseGoal: integer("weekly_exercise_goal").default(5),
   currentWeekSessions: integer("current_week_sessions").default(0),
   totalSessions: integer("total_sessions").default(0),
