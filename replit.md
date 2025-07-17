@@ -23,8 +23,8 @@ Preferred communication style: Simple, everyday language.
 - **Language**: TypeScript with ESM modules
 - **Database**: PostgreSQL with Neon serverless database
 - **ORM**: Drizzle ORM for type-safe database operations
-- **Authentication**: Replit Auth with OpenID Connect integration
-- **Session Management**: Express sessions with PostgreSQL store
+- **Authentication**: JWT-based email/password authentication with bcrypt password hashing
+- **Session Management**: JWT token-based stateless authentication
 
 ### Database Schema
 The application uses PostgreSQL with the following core entities:
@@ -57,14 +57,29 @@ The application uses PostgreSQL with the following core entities:
 - Dashboard with aggregated health insights
 
 ### Authentication & Authorization
-- Replit Auth integration with OpenID Connect
-- Session-based authentication with PostgreSQL session store
-- User profile management with automatic user creation/updates
-- Protected routes with authentication middleware
+- JWT-based email/password authentication system
+- Secure password hashing with bcrypt
+- Token-based stateless authentication
+- User registration and login with comprehensive validation
+- Protected routes with JWT authentication middleware
 
 ## Data Flow
 
-1. **User Authentication**: OpenID Connect flow through Replit Auth creates/updates user records
+1. **User Authentication**: Email/password registration and login with JWT token generation and validation
+
+## Recent Changes
+- ✅ **Authentication Migration Complete (July 17, 2025)**: Successfully migrated from Replit Auth to custom JWT-based email/password authentication system
+- Implemented secure password hashing with bcrypt and JWT token generation
+- Created new registration and login API endpoints with proper validation
+- Updated frontend authentication flow with comprehensive login/register forms
+- Fixed database schema to support integer user IDs and email-based authentication
+- Resolved TensorFlow.js initialization issues in pose detection component
+- All authentication endpoints tested and working correctly
+- Successfully imported and configured the MOMazing postpartum health platform
+- Set up PostgreSQL database with proper schema for users, exercise sessions, mood tracking, chat conversations, and appointments
+- Implemented computer vision pose detection using TensorFlow.js and MediaPipe
+- Created comprehensive UI with mood tracking, exercise guidance, progress visualization, and AI chatbot
+- All core features are functional and ready for development
 2. **Exercise Sessions**: Camera captures video → pose detection analysis → metrics storage → progress updates
 3. **Mood Tracking**: User input → validation → database storage → progress aggregation
 4. **Chat Interactions**: User messages → predefined response logic → conversation persistence

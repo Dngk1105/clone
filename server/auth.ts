@@ -113,7 +113,7 @@ export async function login(req: Request, res: Response) {
   }
 }
 
-export function authMiddleware(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+export async function authMiddleware(req: AuthenticatedRequest, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
   
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -121,12 +121,16 @@ export function authMiddleware(req: AuthenticatedRequest, res: Response, next: N
   }
 
   const token = authHeader.substring(7);
-  const decoded = verifyToken(token);
   
-  if (!decoded) {
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as { userId: number };
+    const user = await storage.getUser(decoded.userId);
+    if (!user) {
+      return res.status(401).json({ message: "User not found" });
+    }
+    req.user = { id: user.id, email: user.email };
+    next();
+  } catch (error) {
     return res.status(401).json({ message: "Invalid token" });
   }
-
-  req.user = decoded;
-  next();
 }

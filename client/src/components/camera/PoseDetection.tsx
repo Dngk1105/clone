@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import * as tf from "@tensorflow/tfjs";
 import * as poseDetection from "@tensorflow-models/pose-detection";
 import "@tensorflow/tfjs-backend-webgl";
 
@@ -32,14 +33,18 @@ export default function PoseDetection({
     let rafId: number;
 
     const loadDetector = async () => {
-      await poseDetection
-        .createDetector(poseDetection.SupportedModels.MoveNet, {
+      try {
+        // Initialize TensorFlow backend
+        await tf.ready();
+        
+        detector = await poseDetection.createDetector(poseDetection.SupportedModels.MoveNet, {
           modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING,
-        })
-        .then((d) => {
-          detector = d;
-          startDetection();
         });
+        
+        startDetection();
+      } catch (error) {
+        console.error('Failed to load pose detector:', error);
+      }
     };
 
     const startDetection = async () => {
