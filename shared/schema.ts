@@ -24,10 +24,11 @@ export const sessions = pgTable(
   (table) => [index("IDX_session_expire").on(table.expire)],
 );
 
-// User storage table - mandatory for Replit Auth
+// User storage table - email/password authentication
 export const users = pgTable("users", {
-  id: varchar("id").primaryKey().notNull(),
-  email: varchar("email").unique(),
+  id: serial("id").primaryKey(),
+  email: varchar("email").unique().notNull(),
+  password: varchar("password").notNull(),
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
@@ -38,7 +39,7 @@ export const users = pgTable("users", {
 // Exercise sessions for tracking workouts
 export const exerciseSessions = pgTable("exercise_sessions", {
   id: serial("id").primaryKey(),
-  userId: varchar("user_id").notNull().references(() => users.id),
+  userId: integer("user_id").notNull().references(() => users.id),
   exerciseType: varchar("exercise_type").notNull(),
   duration: integer("duration"), // in seconds
   reps: integer("reps"),
@@ -51,7 +52,7 @@ export const exerciseSessions = pgTable("exercise_sessions", {
 // Mood tracking for psychological wellness
 export const moodEntries = pgTable("mood_entries", {
   id: serial("id").primaryKey(),
-  userId: varchar("user_id").notNull().references(() => users.id),
+  userId: integer("user_id").notNull().references(() => users.id),
   mood: integer("mood").notNull(), // 1-10 scale
   energy: integer("energy"), // 1-10 scale
   anxiety: integer("anxiety"), // 1-10 scale
@@ -62,7 +63,7 @@ export const moodEntries = pgTable("mood_entries", {
 // Chat conversations with AI assistant
 export const chatConversations = pgTable("chat_conversations", {
   id: serial("id").primaryKey(),
-  userId: varchar("user_id").notNull().references(() => users.id),
+  userId: integer("user_id").notNull().references(() => users.id),
   messages: jsonb("messages").notNull(), // Array of {role: 'user'|'assistant', content: string, timestamp: string}
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -71,7 +72,7 @@ export const chatConversations = pgTable("chat_conversations", {
 // User progress tracking
 export const userProgress = pgTable("user_progress", {
   id: serial("id").primaryKey(),
-  userId: varchar("user_id").notNull().references(() => users.id),
+  userId: integer("user_id").notNull().references(() => users.id),
   weeklyExerciseGoal: integer("weekly_exercise_goal").default(5),
   currentWeekSessions: integer("current_week_sessions").default(0),
   totalSessions: integer("total_sessions").default(0),
@@ -83,7 +84,7 @@ export const userProgress = pgTable("user_progress", {
 // Appointments scheduling
 export const appointments = pgTable("appointments", {
   id: serial("id").primaryKey(),
-  userId: varchar("user_id").notNull().references(() => users.id),
+  userId: integer("user_id").notNull().references(() => users.id),
   providerName: varchar("provider_name").notNull(),
   appointmentType: varchar("appointment_type").notNull(),
   scheduledAt: timestamp("scheduled_at").notNull(),
@@ -93,8 +94,29 @@ export const appointments = pgTable("appointments", {
 });
 
 // Schema types and validation
-export type UpsertUser = typeof users.$inferInsert;
+export type InsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
+
+export const insertUserSchema = createInsertSchema(users).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const loginUserSchema = createInsertSchema(users).pick({
+  email: true,
+  password: true,
+});
+
+export const registerUserSchema = insertUserSchema.pick({
+  email: true,
+  password: true,
+  firstName: true,
+  lastName: true,
+});
+
+export type LoginUser = z.infer<typeof loginUserSchema>;
+export type RegisterUser = z.infer<typeof registerUserSchema>;
 
 export const insertExerciseSessionSchema = createInsertSchema(exerciseSessions).omit({
   id: true,

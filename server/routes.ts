@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { setupAuth, isAuthenticated } from "./replitAuth";
+import { register, login, authMiddleware, AuthenticatedRequest } from "./auth";
 import { 
   insertExerciseSessionSchema,
   insertMoodEntrySchema,
@@ -11,18 +11,24 @@ import {
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Auth middleware
-  await setupAuth(app);
-
   // Auth routes
-  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
+  app.post('/api/register', register);
+  app.post('/api/login', login);
+
+  // Get current user route
+  app.get('/api/user', authMiddleware, async (req: AuthenticatedRequest, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user!.id;
       const user = await storage.getUser(userId);
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
-      res.json(user);
+      res.json({
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+      });
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
@@ -30,9 +36,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Exercise session routes
-  app.post('/api/exercise-sessions', isAuthenticated, async (req: any, res) => {
+  app.post('/api/exercise-sessions', authMiddleware, async (req: AuthenticatedRequest, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user!.id;
       const sessionData = insertExerciseSessionSchema.parse({
         ...req.body,
         userId,
@@ -49,9 +55,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/exercise-sessions', isAuthenticated, async (req: any, res) => {
+  app.get('/api/exercise-sessions', authMiddleware, async (req: AuthenticatedRequest, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user!.id;
       const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
       const sessions = await storage.getUserExerciseSessions(userId, limit);
       res.json(sessions);
@@ -62,9 +68,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Mood tracking routes
-  app.post('/api/mood-entries', isAuthenticated, async (req: any, res) => {
+  app.post('/api/mood-entries', authMiddleware, async (req: AuthenticatedRequest, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user!.id;
       const moodData = insertMoodEntrySchema.parse({
         ...req.body,
         userId,
@@ -81,9 +87,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/mood-entries', isAuthenticated, async (req: any, res) => {
+  app.get('/api/mood-entries', authMiddleware, async (req: AuthenticatedRequest, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user!.id;
       const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
       const entries = await storage.getUserMoodEntries(userId, limit);
       res.json(entries);
@@ -93,9 +99,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/mood-entries/latest', isAuthenticated, async (req: any, res) => {
+  app.get('/api/mood-entries/latest', authMiddleware, async (req: AuthenticatedRequest, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user!.id;
       const entry = await storage.getLatestMoodEntry(userId);
       res.json(entry || null);
     } catch (error) {
@@ -105,9 +111,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Chat conversation routes
-  app.post('/api/chat/conversations', isAuthenticated, async (req: any, res) => {
+  app.post('/api/chat/conversations', authMiddleware, async (req: AuthenticatedRequest, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user!.id;
       const conversationData = insertChatConversationSchema.parse({
         ...req.body,
         userId,
@@ -124,7 +130,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put('/api/chat/conversations/:id', isAuthenticated, async (req: any, res) => {
+  app.put('/api/chat/conversations/:id', authMiddleware, async (req: AuthenticatedRequest, res) => {
     try {
       const conversationId = parseInt(req.params.id);
       const { messages } = req.body;
@@ -137,9 +143,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/chat/conversations', isAuthenticated, async (req: any, res) => {
+  app.get('/api/chat/conversations', authMiddleware, async (req: AuthenticatedRequest, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user!.id;
       const conversations = await storage.getUserChatConversations(userId);
       res.json(conversations);
     } catch (error) {
@@ -148,9 +154,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/chat/conversations/latest', isAuthenticated, async (req: any, res) => {
+  app.get('/api/chat/conversations/latest', authMiddleware, async (req: AuthenticatedRequest, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user!.id;
       const conversation = await storage.getLatestChatConversation(userId);
       res.json(conversation || null);
     } catch (error) {
@@ -160,9 +166,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Progress tracking routes
-  app.get('/api/progress', isAuthenticated, async (req: any, res) => {
+  app.get('/api/progress', authMiddleware, async (req: AuthenticatedRequest, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user!.id;
       const progress = await storage.getUserProgress(userId);
       res.json(progress || null);
     } catch (error) {
@@ -171,9 +177,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put('/api/progress', isAuthenticated, async (req: any, res) => {
+  app.put('/api/progress', authMiddleware, async (req: AuthenticatedRequest, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user!.id;
       const progressData = req.body;
       
       const progress = await storage.updateUserProgress(userId, progressData);
@@ -185,9 +191,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Appointment routes
-  app.post('/api/appointments', isAuthenticated, async (req: any, res) => {
+  app.post('/api/appointments', authMiddleware, async (req: AuthenticatedRequest, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user!.id;
       const appointmentData = insertAppointmentSchema.parse({
         ...req.body,
         userId,
@@ -204,9 +210,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/appointments', isAuthenticated, async (req: any, res) => {
+  app.get('/api/appointments', authMiddleware, async (req: AuthenticatedRequest, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user!.id;
       const appointments = await storage.getUserAppointments(userId);
       res.json(appointments);
     } catch (error) {
@@ -215,7 +221,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put('/api/appointments/:id/status', isAuthenticated, async (req: any, res) => {
+  app.put('/api/appointments/:id/status', authMiddleware, async (req: AuthenticatedRequest, res) => {
     try {
       const appointmentId = parseInt(req.params.id);
       const { status } = req.body;

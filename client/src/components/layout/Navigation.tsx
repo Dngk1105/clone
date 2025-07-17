@@ -25,7 +25,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 export default function Navigation() {
   const [location] = useLocation();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const navItems = [
@@ -121,7 +121,7 @@ export default function Navigation() {
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  onClick={() => window.location.href = '/api/logout'}
+                  onClick={() => logout()}
                   className="text-red-600 cursor-pointer"
                 >
                   <LogOut className="w-4 h-4 mr-2" />
@@ -173,7 +173,7 @@ export default function Navigation() {
                 <Button
                   variant="ghost"
                   className="w-full justify-start text-red-600"
-                  onClick={() => window.location.href = '/api/logout'}
+                  onClick={() => logout()}
                 >
                   <LogOut className="w-4 h-4 mr-2" />
                   Sign out
